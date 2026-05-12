@@ -349,17 +349,37 @@ struct NoDestStateView: View {
 
 struct SettingsPopoverView: View {
     @Binding var autoCopy: Bool
+    @Binding var destinationPath: String
     @Binding var transferModeRaw: String
     @Binding var collisionModeRaw: String
     @Binding var verifyChecksum: Bool
     @Binding var preserveStructure: Bool
     @Environment(\.colorScheme) private var cs
 
+    private var destLabel: String {
+        destinationPath.isEmpty
+            ? "Not set"
+            : URL(fileURLWithPath: destinationPath).lastPathComponent
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             settingLabel("Settings")
                 .padding(.bottom, 10)
 
+            row("Destination folder") {
+                HStack(spacing: 8) {
+                    Text(destLabel)
+                        .font(.system(size: 12))
+                        .foregroundColor(destinationPath.isEmpty ? .red : .secondary)
+                        .lineLimit(1)
+                    Button("Choose…") { chooseDestination() }
+                        .font(.system(size: 12))
+                        .foregroundColor(cs == .dark ? sysBlueLight : sysBlue)
+                        .buttonStyle(.plain)
+                }
+            }
+            Divider().opacity(0.4)
             row("Auto-start on card insert") {
                 Toggle("", isOn: $autoCopy).labelsHidden().tint(sysBlue)
             }
@@ -393,6 +413,17 @@ struct SettingsPopoverView: View {
         }
         .padding(16)
         .frame(width: 300)
+    }
+
+    private func chooseDestination() {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false
+        panel.prompt = "Select"
+        panel.title = "Choose Ingest Destination"
+        panel.message = "Select the folder where photos will be ingested"
+        if panel.runModal() == .OK, let url = panel.url { destinationPath = url.path }
     }
 
     private func settingLabel(_ text: String) -> some View {
@@ -776,6 +807,7 @@ struct ContentView: View {
                 .popover(isPresented: $showSettings, arrowEdge: .bottom) {
                     SettingsPopoverView(
                         autoCopy: $autoCopy,
+                        destinationPath: $destinationPath,
                         transferModeRaw: $transferModeRaw,
                         collisionModeRaw: $collisionModeRaw,
                         verifyChecksum: $verifyChecksum,
