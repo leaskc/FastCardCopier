@@ -14,7 +14,7 @@ FastCard Copier watches for memory cards, finds all your photos and videos, and 
 - **Large, glanceable status** — file count and ring progress visible from across a room
 - **Fast transfer** — 4 concurrent copy streams to saturate card read speed
 - **Copy or Move** — keep originals on card, or clear it as you go
-- **Auto-copy mode** — starts the transfer immediately on card insert if a destination is set
+- **Auto-start mode** — starts the transfer immediately on card insert if a destination is set
 - **Live stats** — throughput (MB/s), ETA, and current filename during transfer
 - **SHA-256 verification** — optional read-back pass to confirm every byte arrived intact
 - **Folder structure preservation** — optionally reproduce the card's directory hierarchy under a dated session folder
@@ -34,39 +34,43 @@ FastCard Copier watches for memory cards, finds all your photos and videos, and 
 
 ---
 
-## Transfer options
+## Settings
 
-All options are shown in the Ready view and persist across launches.
+All settings are accessed via the **gear icon** in the title bar and persist across launches. The main window is intentionally minimal — source card, destination folder, and start button — so there is nothing to configure under pressure.
 
 ### Transfer mode
 
 | Mode | Behaviour |
 |---|---|
-| **Copy** (default) | Files are copied; originals remain on the card |
-| **Move** | Files are copied and verified, then the source is deleted only after a confirmed good copy |
+| **Copy — keep originals** (default) | Files are copied; originals remain on the card |
+| **Move — clear card** | Files are copied and verified, then the source is deleted only after a confirmed good copy |
 
 ### On name collision
 
 Controls what happens when a file with the same name already exists at the destination.
 
-| Mode | Behaviour |
+| Setting | Behaviour |
 |---|---|
 | **Rename** (default) | A numeric suffix is appended — `IMG_0001_2.CR3`, `_3`, etc. No existing data is ever overwritten |
 | **Skip if exists** | The existing file is left untouched. Skipped files are tallied and shown on the complete screen. Useful when re-inserting a card you have already ingested |
 | **Overwrite** | The existing file is replaced |
 
-### Verify (SHA-256)
+### SHA-256 verify
 
 When enabled, after writing each file FastCard Copier reads it back from the destination and compares its SHA-256 hash against the hash computed during the copy. Any mismatch is reported as a checksum failure on the complete screen. See [How transfers work](#how-transfers-work) for details.
 
-### Preserve structure
+### Preserve folder structure
 
-| Mode | Behaviour |
+| Setting | Behaviour |
 |---|---|
-| **Off** (default) | All files land flat in the destination folder, source directory hierarchy is ignored |
+| **Off** (default) | All files land flat in the destination folder; the card's directory hierarchy is ignored |
 | **On** | A session folder named `20250115_143205 EOS_DIGITAL` (timestamp + card name) is created inside the destination. The card's full directory tree from the mount point is reproduced inside it — so `DCIM/100CANON/IMG_0001.CR3` on the card becomes `20250115_143205 EOS_DIGITAL/DCIM/100CANON/IMG_0001.CR3` at the destination |
 
 Each transfer run gets its own dated session folder, so consecutive card ingests to the same destination never collide with each other.
+
+### Auto-start
+
+When enabled, the transfer begins automatically the moment a card is inserted, provided a destination folder is already set.
 
 ---
 
