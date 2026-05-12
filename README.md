@@ -28,9 +28,9 @@ FastCard Copier watches for memory cards, finds all your photos and videos, and 
 |---|---|
 | **Idle** | Waiting for a card to be inserted |
 | **No destination** | Card detected, but no ingest folder has been chosen yet |
-| **Ready** | Card detected, destination set — shows RAW / JPG / video counts and total size |
+| **Ready** | Card detected, destination set — shows RAW / JPG / video / audio counts and total size, with Start and Eject buttons |
 | **Transferring** | Ring progress with animated file countdown, live throughput and ETA |
-| **Complete** | Green confirmation with transfer summary; eject and Reveal in Finder actions |
+| **Complete** | Green confirmation with transfer summary; eject and Reveal in Finder actions. Ejecting returns the app to idle ready for the next card |
 
 ---
 
@@ -70,7 +70,7 @@ Each transfer run gets its own dated session folder, so consecutive card ingests
 
 ### Auto-start
 
-When enabled, the transfer begins automatically the moment a card is inserted, provided a destination folder is already set.
+When enabled, the transfer begins automatically the moment a card is inserted, provided a destination folder is already set. The destination folder and all other settings can be configured from the gear icon before any card is inserted, so the workflow requires no interaction once set up.
 
 ---
 
