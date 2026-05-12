@@ -729,6 +729,12 @@ struct ContentView: View {
         .preferredColorScheme(useDarkMode ? .dark : .light)
         .background(WindowConfigurator())
         .onChange(of: cardDetector.detectedCard) { _, newCard in
+            // Card removed — if transfer is complete, return to idle so the
+            // app is ready for the next card (and auto-start can fire again)
+            if newCard == nil && transferManager.isComplete {
+                transferManager.reset()
+                return
+            }
             guard autoCopy, let card = newCard, let dest = destinationURL,
                   !transferManager.isRunning, !transferManager.isComplete
             else { return }
