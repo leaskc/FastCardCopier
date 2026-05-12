@@ -2,7 +2,7 @@
 
 A macOS utility for photographers to ingest memory cards as fast as possible with minimum friction.
 
-![Platform](https://img.shields.io/badge/platform-macOS%2014%2B-lightgrey) ![Swift](https://img.shields.io/badge/swift-5.9-orange) ![License](https://img.shields.io/badge/license-MIT-blue)
+![Platform](https://img.shields.io/badge/platform-macOS%2014%2B-lightgrey) ![Swift](https://img.shields.io/badge/swift-5.9-orange)
 
 ---
 
