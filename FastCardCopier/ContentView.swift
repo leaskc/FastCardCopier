@@ -440,6 +440,9 @@ struct ReadyStateView: View {
                 if card.videoCount > 0 {
                     StatBadge(label: "MOV", value: card.videoCount, accent: false)
                 }
+                if card.audioCount > 0 {
+                    StatBadge(label: "AUD", value: card.audioCount, accent: false)
+                }
             }
         }
 

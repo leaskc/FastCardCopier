@@ -8,6 +8,7 @@ struct DetectedCard: Equatable {
     let rawCount: Int
     let jpgCount: Int
     let videoCount: Int
+    let audioCount: Int
     let totalBytes: Int64
 
     var totalFiles: Int { files.count }
@@ -93,7 +94,8 @@ class CardDetector: ObservableObject {
                                     "3fr","erf","kdc","mrw","pef","r3d","srw","x3f"]
         let jpgExts: Set<String> = ["jpg","jpeg","tif","tiff","heic","heif","png"]
         let vidExts: Set<String> = ["mp4","mov","mts","m2ts","m4v","avi","mxf"]
-        let allExts = rawExts.union(jpgExts).union(vidExts)
+        let audExts: Set<String> = ["wav","aif","aiff","mp3","flac","m4a","bwf"]
+        let allExts = rawExts.union(jpgExts).union(vidExts).union(audExts)
 
         guard let enumerator = FileManager.default.enumerator(
             at: url,
@@ -102,7 +104,7 @@ class CardDetector: ObservableObject {
         ) else { return nil }
 
         var files: [URL] = []
-        var rawCount = 0, jpgCount = 0, videoCount = 0
+        var rawCount = 0, jpgCount = 0, videoCount = 0, audioCount = 0
         var totalBytes: Int64 = 0
 
         for case let fileURL as URL in enumerator {
@@ -113,13 +115,14 @@ class CardDetector: ObservableObject {
             guard allExts.contains(ext) else { continue }
             files.append(fileURL)
             totalBytes += Int64(vals.fileSize ?? 0)
-            if rawExts.contains(ext) { rawCount += 1 }
+            if rawExts.contains(ext)      { rawCount += 1 }
             else if jpgExts.contains(ext) { jpgCount += 1 }
-            else { videoCount += 1 }
+            else if vidExts.contains(ext) { videoCount += 1 }
+            else                          { audioCount += 1 }
         }
         guard !files.isEmpty else { return nil }
         return DetectedCard(name: url.lastPathComponent, url: url, files: files,
                             rawCount: rawCount, jpgCount: jpgCount, videoCount: videoCount,
-                            totalBytes: totalBytes)
+                            audioCount: audioCount, totalBytes: totalBytes)
     }
 }

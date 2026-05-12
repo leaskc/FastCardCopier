@@ -81,6 +81,7 @@ When enabled, the transfer begins automatically the moment a card is inserted, p
 | RAW | ARW, CR2, CR3, NEF, NRW, ORF, RW2, DNG, RAF, 3FR, ERF, KDC, MRW, PEF, R3D, SRW, X3F |
 | JPEG / still | JPG, JPEG, HEIC, HEIF, PNG, TIF, TIFF |
 | Video | MP4, MOV, MTS, M2TS, M4V, AVI, MXF |
+| Audio | WAV, AIF, AIFF, BWF, MP3, FLAC, M4A |
 
 ---
 
