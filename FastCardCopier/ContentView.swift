@@ -449,6 +449,43 @@ struct SettingsPopoverView: View {
     }
 }
 
+// MARK: - State: Empty card (no recognised media files)
+
+struct EmptyCardStateView: View {
+    let cardName: String
+    let cardURL: URL
+    @Environment(\.colorScheme) private var cs
+
+    var body: some View {
+        Spacer()
+        VStack(spacing: 16) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 24)
+                    .stroke(muted, style: StrokeStyle(lineWidth: 1.5, dash: [6, 4]))
+                    .frame(width: 96, height: 96)
+                Image(systemName: "sdcard")
+                    .font(.system(size: 38, weight: .light))
+                    .foregroundColor(muted)
+            }
+            VStack(spacing: 4) {
+                Text("No media found")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundColor(cs == .dark ? Color(hex: "f3f4f7") : Color(hex: "1c1c1e"))
+                Text("\"\(cardName)\" contains no recognised photo, video, or audio files.")
+                    .font(.system(size: 13))
+                    .foregroundColor(muted)
+                    .multilineTextAlignment(.center)
+            }
+        }
+        Spacer()
+        PrimaryButton("Eject card") {
+            NSWorkspace.shared.unmountAndEjectDevice(atPath: cardURL.path)
+        }
+    }
+
+    private var muted: Color { cs == .dark ? Color.white.opacity(0.45) : Color.black.opacity(0.45) }
+}
+
 // MARK: - State: Ready
 
 struct ReadyStateView: View {
@@ -740,6 +777,7 @@ struct ContentView: View {
 
     private enum AppState {
         case idle, scanning
+        case emptyCard(URL, String)   // url, name — card has no recognised media
         case ready(DetectedCard)
         case noDestination(DetectedCard)
         case transferring
@@ -751,6 +789,9 @@ struct ContentView: View {
         if transferManager.isRunning  { return .transferring }
         if let card = cardDetector.detectedCard {
             return destinationPath.isEmpty ? .noDestination(card) : .ready(card)
+        }
+        if let url = cardDetector.emptyCardURL {
+            return .emptyCard(url, url.lastPathComponent)
         }
         return cardDetector.isScanning ? .scanning : .idle
     }
@@ -862,6 +903,8 @@ struct ContentView: View {
             IdleStateView(isScanning: false)
         case .scanning:
             IdleStateView(isScanning: true)
+        case .emptyCard(let url, let name):
+            EmptyCardStateView(cardName: name, cardURL: url)
         case .noDestination(let card):
             NoDestStateView(card: card, onChooseFolder: chooseDestination)
         case .ready(let card):

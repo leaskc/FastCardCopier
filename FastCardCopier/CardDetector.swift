@@ -23,6 +23,7 @@ struct DetectedCard: Equatable {
 @MainActor
 class CardDetector: ObservableObject {
     @Published var detectedCard: DetectedCard?
+    @Published var emptyCardURL: URL?   // mounted volume with no recognised media files
     @Published var isScanning = false
 
     private var mountObserver: NSObjectProtocol?
@@ -75,12 +76,21 @@ class CardDetector: ObservableObject {
             CardDetector.scanCard(at: url)
         }.value
         isScanning = false
-        guard let card else { return }
-        detectedCard = card
+        if let card {
+            detectedCard = card
+            emptyCardURL = nil
+        } else {
+            // Volume mounted but contains no recognised media — surface it so
+            // the UI can show a "no media" screen with an eject button, rather
+            // than silently returning to idle.
+            emptyCardURL = url
+            detectedCard = nil
+        }
     }
 
     private func handleUnmount(_ url: URL) {
-        if detectedCard?.url == url { detectedCard = nil }
+        if detectedCard?.url == url  { detectedCard  = nil }
+        if emptyCardURL       == url { emptyCardURL  = nil }
     }
 
     func rescan() {
