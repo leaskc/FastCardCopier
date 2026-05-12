@@ -54,7 +54,7 @@ class CardDetector: ObservableObject {
     }
 
     private func checkExistingVolumes() {
-        let keys: [URLResourceKey] = [.volumeIsRemovableKey, .volumeIsInternalKey]
+        let keys: [URLResourceKey] = [.volumeIsRemovableKey]
         guard let volumes = FileManager.default.mountedVolumeURLs(includingResourceValuesForKeys: keys, options: [])
         else { return }
         for volume in volumes where isLikelyMemoryCard(volume) {
@@ -64,9 +64,13 @@ class CardDetector: ObservableObject {
     }
 
     private func isLikelyMemoryCard(_ url: URL) -> Bool {
-        guard let v = try? url.resourceValues(forKeys: [.volumeIsRemovableKey, .volumeIsInternalKey])
+        // Only require the volume to be removable — do not check volumeIsInternal,
+        // which is true for built-in SD card readers on MacBook Pro / Mac mini even
+        // though the media itself is removable. scanCard acts as the real filter:
+        // volumes with no recognised media files return nil.
+        guard let v = try? url.resourceValues(forKeys: [.volumeIsRemovableKey])
         else { return false }
-        return v.volumeIsRemovable == true && v.volumeIsInternal != true
+        return v.volumeIsRemovable == true
     }
 
     private func handleMount(_ url: URL) async {
