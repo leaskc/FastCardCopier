@@ -8,7 +8,7 @@ A macOS utility for photographers to ingest memory cards as fast as possible wit
 
 ## What it does
 
-FastCard Copier watches for memory cards, finds all your photos and videos, and transfers them to a destination folder in one tap. Designed for photographers who shoot tethered or ingest into Lightroom, Capture One, or any folder-watched workflow.
+FastCard Copier watches for memory cards, finds all your photos and videos, and transfers them to a destination folder in one tap. Designed for photographers who ingest into Lightroom, Capture One, or any folder-watched workflow.
 
 - **Auto-detects cards** the moment they mount — no hunting in Finder
 - **Large, glanceable status** — file count and ring progress visible from across a room
