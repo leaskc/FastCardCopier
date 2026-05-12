@@ -46,6 +46,18 @@ private let kBufSize = 4 * 1024 * 1024  // 4 MB — good balance for card I/O
 
 private enum CopyError: Error { case writeFailed, checksumMismatch }
 
+/// Returns the path of `file` relative to `root`, or nil if file is directly in root.
+/// e.g. /Volumes/CARD/DCIM/100EOS/IMG_0001.CR3 relative to /Volumes/CARD → "DCIM/100EOS"
+private func relativeSubdirectory(of file: URL, from root: URL) -> String? {
+    let filePath = file.standardized.path
+    var rootPath = root.standardized.path
+    if !rootPath.hasSuffix("/") { rootPath += "/" }
+    guard filePath.hasPrefix(rootPath) else { return nil }
+    let rel = String(filePath.dropFirst(rootPath.count))
+    let dir = URL(fileURLWithPath: rel).deletingLastPathComponent().path
+    return (dir == "." || dir == "") ? nil : dir
+}
+
 private func uniqueDestination(for source: URL, in directory: URL) -> URL {
     var candidate = directory.appendingPathComponent(source.lastPathComponent)
     guard FileManager.default.fileExists(atPath: candidate.path) else { return candidate }
@@ -170,6 +182,7 @@ class FileTransferManager: ObservableObject {
 
     func start(files: [URL], destination: URL, mode: TransferMode,
                collisionMode: CollisionMode = .rename, verify: Bool = true,
+               preserveStructure: Bool = false, cardRootURL: URL? = nil, cardName: String = "",
                totalBytes: Int64 = 0) {
         state = .running
         totalFiles = files.count
@@ -184,7 +197,10 @@ class FileTransferManager: ObservableObject {
         startTime = Date()
         transferTask = Task {
             await performTransfer(files: files, destination: destination,
-                                  mode: mode, collisionMode: collisionMode, verify: verify)
+                                  mode: mode, collisionMode: collisionMode, verify: verify,
+                                  preserveStructure: preserveStructure,
+                                  cardRootURL: cardRootURL, cardName: cardName,
+                                  startTime: self.startTime ?? Date())
         }
     }
 
@@ -210,9 +226,24 @@ class FileTransferManager: ObservableObject {
 
     private func performTransfer(files: [URL], destination: URL,
                                   mode: TransferMode, collisionMode: CollisionMode,
-                                  verify: Bool) async {
+                                  verify: Bool, preserveStructure: Bool,
+                                  cardRootURL: URL?, cardName: String,
+                                  startTime: Date) async {
+        // When preserving structure, all files go under a single dated session folder.
+        let rootDest: URL
+        if preserveStructure {
+            let fmt = DateFormatter()
+            fmt.dateFormat = "yyyyMMdd_HHmmss"
+            let folderName = cardName.isEmpty
+                ? fmt.string(from: startTime)
+                : "\(fmt.string(from: startTime)) \(cardName)"
+            rootDest = destination.appendingPathComponent(folderName)
+        } else {
+            rootDest = destination
+        }
+
         do {
-            try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
+            try FileManager.default.createDirectory(at: rootDest, withIntermediateDirectories: true)
         } catch {
             state = .failed("Cannot create destination: \(error.localizedDescription)")
             return
@@ -233,20 +264,32 @@ class FileTransferManager: ObservableObject {
                     let size = (try? file.resourceValues(forKeys: [.fileSizeKey]).fileSize)
                         .map { Int64($0) } ?? 0
 
-                    // Resolve destination based on collision mode
+                    // Resolve the target directory for this file
+                    let targetDir: URL
+                    if preserveStructure, let root = cardRootURL,
+                       let subdir = relativeSubdirectory(of: file, from: root) {
+                        targetDir = rootDest.appendingPathComponent(subdir)
+                        // createDirectory is idempotent with intermediates; safe for concurrent tasks
+                        try? FileManager.default.createDirectory(
+                            at: targetDir, withIntermediateDirectories: true)
+                    } else {
+                        targetDir = rootDest
+                    }
+
+                    // Resolve destination path based on collision mode
                     let destURL: URL
                     switch collisionMode {
                     case .rename:
-                        destURL = uniqueDestination(for: file, in: destination)
+                        destURL = uniqueDestination(for: file, in: targetDir)
                     case .skip:
-                        let candidate = destination.appendingPathComponent(file.lastPathComponent)
+                        let candidate = targetDir.appendingPathComponent(file.lastPathComponent)
                         if FileManager.default.fileExists(atPath: candidate.path) {
                             return FileResult(filename: file.lastPathComponent, size: 0,
                                               success: true, verified: true, skipped: true)
                         }
                         destURL = candidate
                     case .overwrite:
-                        destURL = destination.appendingPathComponent(file.lastPathComponent)
+                        destURL = targetDir.appendingPathComponent(file.lastPathComponent)
                         // Pre-remove so the atomic rename inside copyAndVerify can succeed
                         try? FileManager.default.removeItem(at: destURL)
                     }

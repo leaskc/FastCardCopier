@@ -352,6 +352,7 @@ struct ReadyStateView: View {
     @Binding var transferModeRaw: String
     @Binding var collisionModeRaw: String
     @Binding var verifyChecksum: Bool
+    @Binding var preserveStructure: Bool
     @Binding var autoCopy: Bool
     let destinationPath: String
     let onChangeDestination: () -> Void
@@ -361,6 +362,9 @@ struct ReadyStateView: View {
     private var transferMode: TransferMode { TransferMode(rawValue: transferModeRaw) ?? .copy }
     private var collisionMode: CollisionMode { CollisionMode(rawValue: collisionModeRaw) ?? .rename }
     private var muted: Color { cs == .dark ? Color.white.opacity(0.55) : Color.black.opacity(0.55) }
+    private var dot: some View {
+        Text("·").font(.system(size: 12)).foregroundColor(muted.opacity(0.5)).padding(.horizontal, 3)
+    }
     private var destName: String {
         URL(fileURLWithPath: destinationPath).lastPathComponent
     }
@@ -393,61 +397,70 @@ struct ReadyStateView: View {
 
         Spacer()
 
-        // Auto-start + options row
-        HStack {
-            Toggle(isOn: $autoCopy) { }
-                .toggleStyle(.switch)
-                .tint(sysBlue)
+        VStack(spacing: 6) {
+            // Row 1: auto-start + transfer mode + collision mode
+            HStack {
+                Toggle(isOn: $autoCopy) { }
+                    .toggleStyle(.switch)
+                    .tint(sysBlue)
+                    .labelsHidden()
+                Text("Auto-start")
+                    .font(.system(size: 12))
+                    .foregroundColor(muted)
+                    .onTapGesture { autoCopy.toggle() }
+
+                Spacer()
+
+                Picker("", selection: $transferModeRaw) {
+                    Text("Copy").tag(TransferMode.copy.rawValue)
+                    Text("Move").tag(TransferMode.move.rawValue)
+                }
+                .pickerStyle(.menu)
                 .labelsHidden()
-            Text("Auto-start")
                 .font(.system(size: 12))
                 .foregroundColor(muted)
-                .onTapGesture { autoCopy.toggle() }
 
-            Spacer()
+                dot
 
-            // Transfer mode
-            Picker("", selection: $transferModeRaw) {
-                Text("Copy").tag(TransferMode.copy.rawValue)
-                Text("Move").tag(TransferMode.move.rawValue)
-            }
-            .pickerStyle(.menu)
-            .labelsHidden()
-            .font(.system(size: 12))
-            .foregroundColor(muted)
-
-            Text("·")
-                .font(.system(size: 12))
-                .foregroundColor(muted.opacity(0.5))
-                .padding(.horizontal, 3)
-
-            // Collision mode
-            Picker("", selection: $collisionModeRaw) {
-                Text("Rename if exists").tag(CollisionMode.rename.rawValue)
-                Text("Skip if exists").tag(CollisionMode.skip.rawValue)
-                Text("Overwrite").tag(CollisionMode.overwrite.rawValue)
-            }
-            .pickerStyle(.menu)
-            .labelsHidden()
-            .font(.system(size: 12))
-            .foregroundColor(muted)
-
-            Text("·")
-                .font(.system(size: 12))
-                .foregroundColor(muted.opacity(0.5))
-                .padding(.horizontal, 3)
-
-            // SHA-256 verify toggle
-            Toggle(isOn: $verifyChecksum) { }
-                .toggleStyle(.switch)
-                .tint(sysBlue)
+                Picker("", selection: $collisionModeRaw) {
+                    Text("Rename if exists").tag(CollisionMode.rename.rawValue)
+                    Text("Skip if exists").tag(CollisionMode.skip.rawValue)
+                    Text("Overwrite").tag(CollisionMode.overwrite.rawValue)
+                }
+                .pickerStyle(.menu)
                 .labelsHidden()
-                .scaleEffect(0.75)
-                .frame(width: 32)
-            Text("Verify")
                 .font(.system(size: 12))
                 .foregroundColor(muted)
-                .onTapGesture { verifyChecksum.toggle() }
+            }
+
+            // Row 2: verify + preserve structure
+            HStack {
+                Spacer()
+
+                Toggle(isOn: $verifyChecksum) { }
+                    .toggleStyle(.switch)
+                    .tint(sysBlue)
+                    .labelsHidden()
+                    .scaleEffect(0.75)
+                    .frame(width: 32)
+                Text("Verify")
+                    .font(.system(size: 12))
+                    .foregroundColor(muted)
+                    .onTapGesture { verifyChecksum.toggle() }
+
+                dot
+
+                Toggle(isOn: $preserveStructure) { }
+                    .toggleStyle(.switch)
+                    .tint(sysBlue)
+                    .labelsHidden()
+                    .scaleEffect(0.75)
+                    .frame(width: 32)
+                Text("Preserve structure")
+                    .font(.system(size: 12))
+                    .foregroundColor(muted)
+                    .onTapGesture { preserveStructure.toggle() }
+            }
         }
 
         // Start button
@@ -667,6 +680,7 @@ struct ContentView: View {
     @AppStorage("transferMode") private var transferModeRaw = TransferMode.copy.rawValue
     @AppStorage("collisionMode") private var collisionModeRaw = CollisionMode.rename.rawValue
     @AppStorage("verifyChecksum") private var verifyChecksum = true
+    @AppStorage("preserveStructure") private var preserveStructure = false
     @AppStorage("autoCopy") private var autoCopy = false
     @AppStorage("useDarkMode") private var useDarkMode = false
 
@@ -723,7 +737,9 @@ struct ContentView: View {
             else { return }
             transferManager.start(files: card.files, destination: dest,
                                   mode: transferMode, collisionMode: collisionMode,
-                                  verify: verifyChecksum, totalBytes: card.totalBytes)
+                                  verify: verifyChecksum, preserveStructure: preserveStructure,
+                                  cardRootURL: card.url, cardName: card.name,
+                                  totalBytes: card.totalBytes)
         }
     }
 
@@ -781,6 +797,7 @@ struct ContentView: View {
                 transferModeRaw: $transferModeRaw,
                 collisionModeRaw: $collisionModeRaw,
                 verifyChecksum: $verifyChecksum,
+                preserveStructure: $preserveStructure,
                 autoCopy: $autoCopy,
                 destinationPath: destinationPath,
                 onChangeDestination: chooseDestination,
@@ -788,7 +805,9 @@ struct ContentView: View {
                     guard let dest = destinationURL else { return }
                     transferManager.start(files: card.files, destination: dest,
                                           mode: transferMode, collisionMode: collisionMode,
-                                          verify: verifyChecksum, totalBytes: card.totalBytes)
+                                          verify: verifyChecksum, preserveStructure: preserveStructure,
+                                          cardRootURL: card.url, cardName: card.name,
+                                          totalBytes: card.totalBytes)
                 }
             )
         case .transferring:
