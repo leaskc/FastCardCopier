@@ -60,16 +60,19 @@ private func uniqueDestination(for source: URL, in directory: URL) -> URL {
     return candidate
 }
 
-/// Streams `source` into a hidden `.tmp-{uuid}` file in the same directory as `dest`,
-/// hashing source inline and re-reading the temp to verify. On success, atomically
-/// renames the temp to `dest`. The file is never visible at `dest` until fully verified,
-/// so watch-folder apps (Lightroom, Capture One, etc.) never see a partial or
-/// unverified file. Throws CopyError.checksumMismatch and removes the temp on mismatch.
-private func copyAndVerify(from source: URL, to dest: URL) throws -> String {
+/// Copies `source` into a hidden `.tmp-{uuid}` file, then atomically renames it to `dest`.
+/// The file is never visible at its final path until the copy is complete, so watch-folder
+/// apps never see a partial file.
+///
+/// When `verify` is true, the temp file is re-read after writing and its SHA-256 is compared
+/// against the source hash captured during the copy. Throws CopyError.checksumMismatch
+/// (and removes the temp) if they differ. When `verify` is false the rename happens
+/// immediately after the write — no extra read pass.
+private func copyAndVerify(from source: URL, to dest: URL, verify: Bool) throws -> String {
     let dir    = dest.deletingLastPathComponent()
     let tmpURL = dir.appendingPathComponent(".\(UUID().uuidString).tmp")
 
-    // ── 1. Stream-copy while hashing the source ──────────────────────────
+    // ── 1. Stream-copy while hashing the source (hashing is free vs. I/O) ─
     let src = try FileHandle(forReadingFrom: source)
     defer { try? src.close() }
 
@@ -91,24 +94,24 @@ private func copyAndVerify(from source: URL, to dest: URL) throws -> String {
     }
     let srcDigest = srcHasher.finalize()
 
-    // ── 2. Re-read temp file and hash it ─────────────────────────────────
-    let verify = try FileHandle(forReadingFrom: tmpURL)
-    defer { try? verify.close() }
+    // ── 2. (Optional) Re-read temp and compare hashes ────────────────────
+    if verify {
+        let fh = try FileHandle(forReadingFrom: tmpURL)
+        defer { try? fh.close() }
 
-    var dstHasher = SHA256()
-    while true {
-        guard let chunk = try verify.read(upToCount: kBufSize), !chunk.isEmpty else { break }
-        dstHasher.update(data: chunk)
+        var dstHasher = SHA256()
+        while true {
+            guard let chunk = try fh.read(upToCount: kBufSize), !chunk.isEmpty else { break }
+            dstHasher.update(data: chunk)
+        }
+
+        guard srcDigest == dstHasher.finalize() else {
+            try? FileManager.default.removeItem(at: tmpURL)
+            throw CopyError.checksumMismatch
+        }
     }
-    let dstDigest = dstHasher.finalize()
 
-    // ── 3. Compare ────────────────────────────────────────────────────────
-    guard srcDigest == dstDigest else {
-        try? FileManager.default.removeItem(at: tmpURL)
-        throw CopyError.checksumMismatch
-    }
-
-    // ── 4. Atomic rename → dest (file appears at final path only now) ─────
+    // ── 3. Atomic rename → dest (file appears at final path only now) ─────
     do {
         try FileManager.default.moveItem(at: tmpURL, to: dest)
     } catch {
@@ -129,6 +132,7 @@ class FileTransferManager: ObservableObject {
     @Published var failedCount = 0
     @Published var checksumFailedCount = 0
     @Published var skippedCount = 0
+    @Published var verifyEnabled = true   // reflects the setting used for the current/last run
     @Published var currentFile = ""
     @Published var bytesTransferred: Int64 = 0
     var totalTransferBytes: Int64 = 0
@@ -155,20 +159,22 @@ class FileTransferManager: ObservableObject {
     private var transferTask: Task<Void, Never>?
 
     func start(files: [URL], destination: URL, mode: TransferMode,
-               collisionMode: CollisionMode = .rename, totalBytes: Int64 = 0) {
+               collisionMode: CollisionMode = .rename, verify: Bool = true,
+               totalBytes: Int64 = 0) {
         state = .running
         totalFiles = files.count
         completedFiles = 0
         failedCount = 0
         checksumFailedCount = 0
         skippedCount = 0
+        verifyEnabled = verify
         currentFile = ""
         bytesTransferred = 0
         totalTransferBytes = totalBytes
         startTime = Date()
         transferTask = Task {
             await performTransfer(files: files, destination: destination,
-                                  mode: mode, collisionMode: collisionMode)
+                                  mode: mode, collisionMode: collisionMode, verify: verify)
         }
     }
 
@@ -193,7 +199,8 @@ class FileTransferManager: ObservableObject {
     }
 
     private func performTransfer(files: [URL], destination: URL,
-                                  mode: TransferMode, collisionMode: CollisionMode) async {
+                                  mode: TransferMode, collisionMode: CollisionMode,
+                                  verify: Bool) async {
         do {
             try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
         } catch {
@@ -235,7 +242,7 @@ class FileTransferManager: ObservableObject {
                     }
 
                     do {
-                        _ = try copyAndVerify(from: file, to: destURL)
+                        _ = try copyAndVerify(from: file, to: destURL, verify: verify)
 
                         // For Move: only delete source after confirmed good copy
                         if mode == .move {

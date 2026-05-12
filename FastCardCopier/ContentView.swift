@@ -351,6 +351,7 @@ struct ReadyStateView: View {
     let card: DetectedCard
     @Binding var transferModeRaw: String
     @Binding var collisionModeRaw: String
+    @Binding var verifyChecksum: Bool
     @Binding var autoCopy: Bool
     let destinationPath: String
     let onChangeDestination: () -> Void
@@ -430,6 +431,23 @@ struct ReadyStateView: View {
             .labelsHidden()
             .font(.system(size: 12))
             .foregroundColor(muted)
+
+            Text("·")
+                .font(.system(size: 12))
+                .foregroundColor(muted.opacity(0.5))
+                .padding(.horizontal, 3)
+
+            // SHA-256 verify toggle
+            Toggle(isOn: $verifyChecksum) { }
+                .toggleStyle(.switch)
+                .tint(sysBlue)
+                .labelsHidden()
+                .scaleEffect(0.75)
+                .frame(width: 32)
+            Text("Verify")
+                .font(.system(size: 12))
+                .foregroundColor(muted)
+                .onTapGesture { verifyChecksum.toggle() }
         }
 
         // Start button
@@ -539,6 +557,10 @@ struct CompleteStateView: View {
         manager.checksumFailedCount == 0 && manager.failedCount == 0
     }
 
+    private var hasProblems: Bool {
+        manager.checksumFailedCount > 0 || manager.failedCount > 0
+    }
+
     private var copiedCount: Int { manager.totalFiles - manager.skippedCount }
 
     var body: some View {
@@ -548,14 +570,14 @@ struct CompleteStateView: View {
             ZStack {
                 Circle()
                     .fill(LinearGradient(
-                        colors: allVerified
-                            ? [Color(hex: "34d058"), Color(hex: "28a745")]
-                            : [Color(hex: "ffb340"), Color(hex: "ff9500")],
+                        colors: hasProblems
+                            ? [Color(hex: "ffb340"), Color(hex: "ff9500")]
+                            : [Color(hex: "34d058"), Color(hex: "28a745")],
                         startPoint: .top, endPoint: .bottom))
                     .frame(width: 140, height: 140)
-                    .shadow(color: (allVerified ? Color(hex: "28a745") : Color(hex: "ff9500")).opacity(0.4),
+                    .shadow(color: (hasProblems ? Color(hex: "ff9500") : Color(hex: "28a745")).opacity(0.4),
                             radius: 24)
-                Image(systemName: allVerified ? "checkmark" : "exclamationmark")
+                Image(systemName: hasProblems ? "exclamationmark" : "checkmark")
                     .font(.system(size: 64, weight: .semibold))
                     .foregroundColor(.white)
             }
@@ -580,10 +602,12 @@ struct CompleteStateView: View {
                         .foregroundColor(.secondary)
                 }
                 // Verification status
-                if allVerified {
+                if manager.verifyEnabled && allVerified {
                     Label("SHA-256 verified", systemImage: "checkmark.shield.fill")
                         .font(.system(size: 12, weight: .medium))
                         .foregroundColor(Color(hex: "28a745"))
+                } else if !manager.verifyEnabled {
+                    // no badge — verification was off
                 } else {
                     if manager.checksumFailedCount > 0 {
                         Label("\(manager.checksumFailedCount) checksum failure\(manager.checksumFailedCount == 1 ? "" : "s") — re-copy those files",
@@ -642,6 +666,7 @@ struct ContentView: View {
     @AppStorage("destinationPath") private var destinationPath = ""
     @AppStorage("transferMode") private var transferModeRaw = TransferMode.copy.rawValue
     @AppStorage("collisionMode") private var collisionModeRaw = CollisionMode.rename.rawValue
+    @AppStorage("verifyChecksum") private var verifyChecksum = true
     @AppStorage("autoCopy") private var autoCopy = false
     @AppStorage("useDarkMode") private var useDarkMode = false
 
@@ -698,7 +723,7 @@ struct ContentView: View {
             else { return }
             transferManager.start(files: card.files, destination: dest,
                                   mode: transferMode, collisionMode: collisionMode,
-                                  totalBytes: card.totalBytes)
+                                  verify: verifyChecksum, totalBytes: card.totalBytes)
         }
     }
 
@@ -755,6 +780,7 @@ struct ContentView: View {
                 card: card,
                 transferModeRaw: $transferModeRaw,
                 collisionModeRaw: $collisionModeRaw,
+                verifyChecksum: $verifyChecksum,
                 autoCopy: $autoCopy,
                 destinationPath: destinationPath,
                 onChangeDestination: chooseDestination,
@@ -762,7 +788,7 @@ struct ContentView: View {
                     guard let dest = destinationURL else { return }
                     transferManager.start(files: card.files, destination: dest,
                                           mode: transferMode, collisionMode: collisionMode,
-                                          totalBytes: card.totalBytes)
+                                          verify: verifyChecksum, totalBytes: card.totalBytes)
                 }
             )
         case .transferring:
