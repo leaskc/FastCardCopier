@@ -42,7 +42,9 @@ class CardDetector: ObservableObject {
         mountObserver = NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didMountNotification, object: nil, queue: .main
         ) { [weak self] notification in
-            guard let url = notification.userInfo?[NSWorkspace.volumeURLUserInfoKey] as? URL else { return }
+            guard let url = notification.userInfo?[NSWorkspace.volumeURLUserInfoKey] as? URL,
+                  (try? url.resourceValues(forKeys: [.volumeIsRemovableKey]))?.volumeIsRemovable == true
+            else { return }
             Task { @MainActor [weak self] in await self?.handleMount(url) }
         }
         unmountObserver = NSWorkspace.shared.notificationCenter.addObserver(
@@ -54,27 +56,20 @@ class CardDetector: ObservableObject {
     }
 
     private func checkExistingVolumes() {
-        let keys: [URLResourceKey] = [.volumeIsRemovableKey]
-        guard let volumes = FileManager.default.mountedVolumeURLs(includingResourceValuesForKeys: keys, options: [])
+        // On launch, resource-value pre-fetching from mountedVolumeURLs can
+        // be unreliable, so skip the removable check and instead probe every
+        // volume mounted under /Volumes/. scanCard returns nil for anything
+        // that contains no recognised media files, acting as the real filter.
+        guard let volumes = FileManager.default.mountedVolumeURLs(
+            includingResourceValuesForKeys: nil, options: [])
         else { return }
-        for volume in volumes where isLikelyMemoryCard(volume) {
+        for volume in volumes where volume.path.hasPrefix("/Volumes/") {
             Task { await handleMount(volume) }
-            return
+            return  // one card at a time
         }
     }
 
-    private func isLikelyMemoryCard(_ url: URL) -> Bool {
-        // Only require the volume to be removable — do not check volumeIsInternal,
-        // which is true for built-in SD card readers on MacBook Pro / Mac mini even
-        // though the media itself is removable. scanCard acts as the real filter:
-        // volumes with no recognised media files return nil.
-        guard let v = try? url.resourceValues(forKeys: [.volumeIsRemovableKey])
-        else { return false }
-        return v.volumeIsRemovable == true
-    }
-
     private func handleMount(_ url: URL) async {
-        guard isLikelyMemoryCard(url) else { return }
         isScanning = true
         let card = await Task.detached(priority: .userInitiated) {
             CardDetector.scanCard(at: url)
