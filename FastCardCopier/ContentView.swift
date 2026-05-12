@@ -726,7 +726,7 @@ struct ContentView: View {
     @AppStorage("collisionMode") private var collisionModeRaw = CollisionMode.rename.rawValue
     @AppStorage("verifyChecksum") private var verifyChecksum = true
     @AppStorage("preserveStructure") private var preserveStructure = false
-    @AppStorage("autoCopy") private var autoCopy = false
+    @State private var autoCopy = false
     @AppStorage("useDarkMode") private var useDarkMode = false
 
     @State private var showSettings = false
