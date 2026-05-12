@@ -367,7 +367,7 @@ struct SettingsPopoverView: View {
             row("Transfer mode") {
                 Picker("", selection: $transferModeRaw) {
                     Text("Copy — keep originals").tag(TransferMode.copy.rawValue)
-                    Text("Move — erase card").tag(TransferMode.move.rawValue)
+                    Text("Move — clear card").tag(TransferMode.move.rawValue)
                 }
                 .pickerStyle(.menu)
                 .labelsHidden()
