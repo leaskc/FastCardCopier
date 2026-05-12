@@ -345,29 +345,88 @@ struct NoDestStateView: View {
     }
 }
 
+// MARK: - Settings popover
+
+struct SettingsPopoverView: View {
+    @Binding var autoCopy: Bool
+    @Binding var transferModeRaw: String
+    @Binding var collisionModeRaw: String
+    @Binding var verifyChecksum: Bool
+    @Binding var preserveStructure: Bool
+    @Environment(\.colorScheme) private var cs
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            settingLabel("Settings")
+                .padding(.bottom, 10)
+
+            row("Auto-start on card insert") {
+                Toggle("", isOn: $autoCopy).labelsHidden().tint(sysBlue)
+            }
+            Divider().opacity(0.4)
+            row("Transfer mode") {
+                Picker("", selection: $transferModeRaw) {
+                    Text("Copy — keep originals").tag(TransferMode.copy.rawValue)
+                    Text("Move — erase card").tag(TransferMode.move.rawValue)
+                }
+                .pickerStyle(.menu)
+                .labelsHidden()
+            }
+            Divider().opacity(0.4)
+            row("On name collision") {
+                Picker("", selection: $collisionModeRaw) {
+                    Text("Rename").tag(CollisionMode.rename.rawValue)
+                    Text("Skip if exists").tag(CollisionMode.skip.rawValue)
+                    Text("Overwrite").tag(CollisionMode.overwrite.rawValue)
+                }
+                .pickerStyle(.menu)
+                .labelsHidden()
+            }
+            Divider().opacity(0.4)
+            row("SHA-256 verify") {
+                Toggle("", isOn: $verifyChecksum).labelsHidden().tint(sysBlue)
+            }
+            Divider().opacity(0.4)
+            row("Preserve folder structure") {
+                Toggle("", isOn: $preserveStructure).labelsHidden().tint(sysBlue)
+            }
+        }
+        .padding(16)
+        .frame(width: 300)
+    }
+
+    private func settingLabel(_ text: String) -> some View {
+        Text(text)
+            .font(.system(size: 11, weight: .semibold))
+            .textCase(.uppercase)
+            .tracking(0.6)
+            .foregroundColor(.secondary)
+    }
+
+    private func row<T: View>(_ label: String, @ViewBuilder control: () -> T) -> some View {
+        HStack {
+            Text(label)
+                .font(.system(size: 13))
+            Spacer()
+            control()
+                .font(.system(size: 13))
+        }
+        .padding(.vertical, 9)
+    }
+}
+
 // MARK: - State: Ready
 
 struct ReadyStateView: View {
     let card: DetectedCard
     @Binding var transferModeRaw: String
-    @Binding var collisionModeRaw: String
-    @Binding var verifyChecksum: Bool
-    @Binding var preserveStructure: Bool
-    @Binding var autoCopy: Bool
     let destinationPath: String
     let onChangeDestination: () -> Void
     let onStartTransfer: () -> Void
     @Environment(\.colorScheme) private var cs
 
     private var transferMode: TransferMode { TransferMode(rawValue: transferModeRaw) ?? .copy }
-    private var collisionMode: CollisionMode { CollisionMode(rawValue: collisionModeRaw) ?? .rename }
-    private var muted: Color { cs == .dark ? Color.white.opacity(0.55) : Color.black.opacity(0.55) }
-    private var dot: some View {
-        Text("·").font(.system(size: 12)).foregroundColor(muted.opacity(0.5)).padding(.horizontal, 3)
-    }
-    private var destName: String {
-        URL(fileURLWithPath: destinationPath).lastPathComponent
-    }
+    private var destName: String { URL(fileURLWithPath: destinationPath).lastPathComponent }
 
     var body: some View {
         // Source card with RAW/JPG/MOV stats
@@ -397,73 +456,6 @@ struct ReadyStateView: View {
 
         Spacer()
 
-        VStack(spacing: 6) {
-            // Row 1: auto-start + transfer mode + collision mode
-            HStack {
-                Toggle(isOn: $autoCopy) { }
-                    .toggleStyle(.switch)
-                    .tint(sysBlue)
-                    .labelsHidden()
-                Text("Auto-start")
-                    .font(.system(size: 12))
-                    .foregroundColor(muted)
-                    .onTapGesture { autoCopy.toggle() }
-
-                Spacer()
-
-                Picker("", selection: $transferModeRaw) {
-                    Text("Copy").tag(TransferMode.copy.rawValue)
-                    Text("Move").tag(TransferMode.move.rawValue)
-                }
-                .pickerStyle(.menu)
-                .labelsHidden()
-                .font(.system(size: 12))
-                .foregroundColor(muted)
-
-                dot
-
-                Picker("", selection: $collisionModeRaw) {
-                    Text("Rename if exists").tag(CollisionMode.rename.rawValue)
-                    Text("Skip if exists").tag(CollisionMode.skip.rawValue)
-                    Text("Overwrite").tag(CollisionMode.overwrite.rawValue)
-                }
-                .pickerStyle(.menu)
-                .labelsHidden()
-                .font(.system(size: 12))
-                .foregroundColor(muted)
-            }
-
-            // Row 2: verify + preserve structure
-            HStack {
-                Spacer()
-
-                Toggle(isOn: $verifyChecksum) { }
-                    .toggleStyle(.switch)
-                    .tint(sysBlue)
-                    .labelsHidden()
-                    .scaleEffect(0.75)
-                    .frame(width: 32)
-                Text("Verify")
-                    .font(.system(size: 12))
-                    .foregroundColor(muted)
-                    .onTapGesture { verifyChecksum.toggle() }
-
-                dot
-
-                Toggle(isOn: $preserveStructure) { }
-                    .toggleStyle(.switch)
-                    .tint(sysBlue)
-                    .labelsHidden()
-                    .scaleEffect(0.75)
-                    .frame(width: 32)
-                Text("Preserve structure")
-                    .font(.system(size: 12))
-                    .foregroundColor(muted)
-                    .onTapGesture { preserveStructure.toggle() }
-            }
-        }
-
-        // Start button
         PrimaryButton(
             transferMode == .copy
                 ? "Copy \(card.totalFiles.formatted()) files · \(card.totalGBString)"
@@ -684,6 +676,8 @@ struct ContentView: View {
     @AppStorage("autoCopy") private var autoCopy = false
     @AppStorage("useDarkMode") private var useDarkMode = false
 
+    @State private var showSettings = false
+
     @Environment(\.colorScheme) private var cs
     private var isDark: Bool { cs == .dark }
 
@@ -761,6 +755,25 @@ struct ContentView: View {
                     .kerning(-0.1)
                 Spacer()
 
+                // Settings
+                Button(action: { showSettings.toggle() }) {
+                    Image(systemName: "gearshape")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(isDark ? Color.white.opacity(0.6) : Color.black.opacity(0.5))
+                        .frame(width: 28, height: 28)
+                }
+                .buttonStyle(.plain)
+                .help("Settings")
+                .popover(isPresented: $showSettings, arrowEdge: .bottom) {
+                    SettingsPopoverView(
+                        autoCopy: $autoCopy,
+                        transferModeRaw: $transferModeRaw,
+                        collisionModeRaw: $collisionModeRaw,
+                        verifyChecksum: $verifyChecksum,
+                        preserveStructure: $preserveStructure
+                    )
+                }
+
                 // Dark/light mode toggle
                 Button(action: { useDarkMode.toggle() }) {
                     Image(systemName: isDark ? "sun.max" : "moon")
@@ -795,10 +808,6 @@ struct ContentView: View {
             ReadyStateView(
                 card: card,
                 transferModeRaw: $transferModeRaw,
-                collisionModeRaw: $collisionModeRaw,
-                verifyChecksum: $verifyChecksum,
-                preserveStructure: $preserveStructure,
-                autoCopy: $autoCopy,
                 destinationPath: destinationPath,
                 onChangeDestination: chooseDestination,
                 onStartTransfer: {
