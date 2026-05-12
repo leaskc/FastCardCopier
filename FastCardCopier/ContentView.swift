@@ -350,6 +350,7 @@ struct NoDestStateView: View {
 struct ReadyStateView: View {
     let card: DetectedCard
     @Binding var transferModeRaw: String
+    @Binding var collisionModeRaw: String
     @Binding var autoCopy: Bool
     let destinationPath: String
     let onChangeDestination: () -> Void
@@ -357,6 +358,7 @@ struct ReadyStateView: View {
     @Environment(\.colorScheme) private var cs
 
     private var transferMode: TransferMode { TransferMode(rawValue: transferModeRaw) ?? .copy }
+    private var collisionMode: CollisionMode { CollisionMode(rawValue: collisionModeRaw) ?? .rename }
     private var muted: Color { cs == .dark ? Color.white.opacity(0.55) : Color.black.opacity(0.55) }
     private var destName: String {
         URL(fileURLWithPath: destinationPath).lastPathComponent
@@ -390,29 +392,52 @@ struct ReadyStateView: View {
 
         Spacer()
 
-        // Auto-start + mode row
+        // Auto-start + options row
         HStack {
-            Toggle(isOn: $autoCopy) {
-                Text("Auto-start when card inserted")
-                    .font(.system(size: 12))
-                    .foregroundColor(muted)
-            }
-            .toggleStyle(.switch)
-            .tint(sysBlue)
-            .labelsHidden()
-            Text("Auto-start when card inserted")
+            Toggle(isOn: $autoCopy) { }
+                .toggleStyle(.switch)
+                .tint(sysBlue)
+                .labelsHidden()
+            Text("Auto-start")
                 .font(.system(size: 12))
                 .foregroundColor(muted)
                 .onTapGesture { autoCopy.toggle() }
+
             Spacer()
-            Text(transferMode == .copy ? "Copy · keep originals" : "Move · remove from card")
+
+            // Transfer mode
+            Picker("", selection: $transferModeRaw) {
+                Text("Copy").tag(TransferMode.copy.rawValue)
+                Text("Move").tag(TransferMode.move.rawValue)
+            }
+            .pickerStyle(.menu)
+            .labelsHidden()
+            .font(.system(size: 12))
+            .foregroundColor(muted)
+
+            Text("·")
                 .font(.system(size: 12))
-                .foregroundColor(muted)
+                .foregroundColor(muted.opacity(0.5))
+                .padding(.horizontal, 3)
+
+            // Collision mode
+            Picker("", selection: $collisionModeRaw) {
+                Text("Rename if exists").tag(CollisionMode.rename.rawValue)
+                Text("Skip if exists").tag(CollisionMode.skip.rawValue)
+                Text("Overwrite").tag(CollisionMode.overwrite.rawValue)
+            }
+            .pickerStyle(.menu)
+            .labelsHidden()
+            .font(.system(size: 12))
+            .foregroundColor(muted)
         }
 
-        // Copy button
-        PrimaryButton("Copy \(card.totalFiles.formatted()) files · \(card.totalGBString)",
-                      action: onStartTransfer)
+        // Start button
+        PrimaryButton(
+            transferMode == .copy
+                ? "Copy \(card.totalFiles.formatted()) files · \(card.totalGBString)"
+                : "Move \(card.totalFiles.formatted()) files · \(card.totalGBString)",
+            action: onStartTransfer)
     }
 }
 
@@ -514,6 +539,8 @@ struct CompleteStateView: View {
         manager.checksumFailedCount == 0 && manager.failedCount == 0
     }
 
+    private var copiedCount: Int { manager.totalFiles - manager.skippedCount }
+
     var body: some View {
         Spacer()
         VStack(spacing: 18) {
@@ -534,13 +561,22 @@ struct CompleteStateView: View {
             }
 
             VStack(spacing: 6) {
-                Text("All \(manager.totalFiles.formatted()) files copied")
+                Text(copiedCount == manager.totalFiles
+                     ? "All \(manager.totalFiles.formatted()) files copied"
+                     : "\(copiedCount.formatted()) of \(manager.totalFiles.formatted()) files copied")
                     .font(.system(size: 36, weight: .semibold, design: .rounded))
                     .monospacedDigit()
                     .multilineTextAlignment(.center)
                 if !summaryLine.isEmpty {
                     Text(summaryLine)
                         .font(.system(size: 13))
+                        .foregroundColor(.secondary)
+                }
+                // Skipped files (skip collision mode)
+                if manager.skippedCount > 0 {
+                    Label("\(manager.skippedCount) already present, skipped",
+                          systemImage: "arrow.uturn.left.circle")
+                        .font(.system(size: 12))
                         .foregroundColor(.secondary)
                 }
                 // Verification status
@@ -605,6 +641,7 @@ struct ContentView: View {
 
     @AppStorage("destinationPath") private var destinationPath = ""
     @AppStorage("transferMode") private var transferModeRaw = TransferMode.copy.rawValue
+    @AppStorage("collisionMode") private var collisionModeRaw = CollisionMode.rename.rawValue
     @AppStorage("autoCopy") private var autoCopy = false
     @AppStorage("useDarkMode") private var useDarkMode = false
 
@@ -660,7 +697,8 @@ struct ContentView: View {
                   !transferManager.isRunning, !transferManager.isComplete
             else { return }
             transferManager.start(files: card.files, destination: dest,
-                                  mode: transferMode, totalBytes: card.totalBytes)
+                                  mode: transferMode, collisionMode: collisionMode,
+                                  totalBytes: card.totalBytes)
         }
     }
 
@@ -716,13 +754,15 @@ struct ContentView: View {
             ReadyStateView(
                 card: card,
                 transferModeRaw: $transferModeRaw,
+                collisionModeRaw: $collisionModeRaw,
                 autoCopy: $autoCopy,
                 destinationPath: destinationPath,
                 onChangeDestination: chooseDestination,
                 onStartTransfer: {
                     guard let dest = destinationURL else { return }
                     transferManager.start(files: card.files, destination: dest,
-                                          mode: transferMode, totalBytes: card.totalBytes)
+                                          mode: transferMode, collisionMode: collisionMode,
+                                          totalBytes: card.totalBytes)
                 }
             )
         case .transferring:
@@ -744,6 +784,7 @@ struct ContentView: View {
     // MARK: - Helpers
 
     private var transferMode: TransferMode { TransferMode(rawValue: transferModeRaw) ?? .copy }
+    private var collisionMode: CollisionMode { CollisionMode(rawValue: collisionModeRaw) ?? .rename }
 
     private var windowGradient: LinearGradient {
         isDark
