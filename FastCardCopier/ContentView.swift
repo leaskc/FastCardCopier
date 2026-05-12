@@ -454,6 +454,9 @@ struct TransferringStateView: View {
                     if !manager.currentFile.isEmpty {
                         KVRow("Current", manager.currentFile, mono: true)
                     }
+                    if manager.checksumFailedCount > 0 {
+                        KVRow("Checksum errors", "\(manager.checksumFailedCount)")
+                    }
                 }
                 .font(.system(size: 12))
             }
@@ -507,17 +510,25 @@ struct CompleteStateView: View {
         return parts.joined(separator: " · ")
     }
 
+    private var allVerified: Bool {
+        manager.checksumFailedCount == 0 && manager.failedCount == 0
+    }
+
     var body: some View {
         Spacer()
         VStack(spacing: 18) {
-            // Big green circle
+            // Big circle — green if all verified, amber if any checksum failures
             ZStack {
                 Circle()
-                    .fill(LinearGradient(colors: [Color(hex: "34d058"), Color(hex: "28a745")],
-                                        startPoint: .top, endPoint: .bottom))
+                    .fill(LinearGradient(
+                        colors: allVerified
+                            ? [Color(hex: "34d058"), Color(hex: "28a745")]
+                            : [Color(hex: "ffb340"), Color(hex: "ff9500")],
+                        startPoint: .top, endPoint: .bottom))
                     .frame(width: 140, height: 140)
-                    .shadow(color: Color(hex: "28a745").opacity(0.4), radius: 24)
-                Image(systemName: "checkmark")
+                    .shadow(color: (allVerified ? Color(hex: "28a745") : Color(hex: "ff9500")).opacity(0.4),
+                            radius: 24)
+                Image(systemName: allVerified ? "checkmark" : "exclamationmark")
                     .font(.system(size: 64, weight: .semibold))
                     .foregroundColor(.white)
             }
@@ -532,10 +543,24 @@ struct CompleteStateView: View {
                         .font(.system(size: 13))
                         .foregroundColor(.secondary)
                 }
-                if manager.failedCount > 0 {
-                    Text("\(manager.failedCount) file\(manager.failedCount == 1 ? "" : "s") failed")
-                        .font(.system(size: 12))
-                        .foregroundColor(.orange)
+                // Verification status
+                if allVerified {
+                    Label("SHA-256 verified", systemImage: "checkmark.shield.fill")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(Color(hex: "28a745"))
+                } else {
+                    if manager.checksumFailedCount > 0 {
+                        Label("\(manager.checksumFailedCount) checksum failure\(manager.checksumFailedCount == 1 ? "" : "s") — re-copy those files",
+                              systemImage: "exclamationmark.triangle.fill")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(.orange)
+                    }
+                    if manager.failedCount > 0 {
+                        Label("\(manager.failedCount) file\(manager.failedCount == 1 ? "" : "s") failed to copy",
+                              systemImage: "xmark.circle.fill")
+                            .font(.system(size: 12))
+                            .foregroundColor(.red)
+                    }
                 }
             }
         }
