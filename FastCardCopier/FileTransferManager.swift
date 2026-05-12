@@ -111,7 +111,17 @@ private func copyAndVerify(from source: URL, to dest: URL, verify: Bool) throws 
         }
     }
 
-    // ── 3. Atomic rename → dest (file appears at final path only now) ─────
+    // ── 3. Preserve source timestamps on the temp file before rename ─────
+    //    (moveItem carries the temp's attributes forward, so we must stamp
+    //     before the rename, not after)
+    if let srcAttrs = try? FileManager.default.attributesOfItem(atPath: source.path) {
+        var stamp: [FileAttributeKey: Any] = [:]
+        if let d = srcAttrs[.creationDate]     { stamp[.creationDate]     = d }
+        if let d = srcAttrs[.modificationDate] { stamp[.modificationDate] = d }
+        try? FileManager.default.setAttributes(stamp, ofItemAtPath: tmpURL.path)
+    }
+
+    // ── 4. Atomic rename → dest (file appears at final path only now) ─────
     do {
         try FileManager.default.moveItem(at: tmpURL, to: dest)
     } catch {
