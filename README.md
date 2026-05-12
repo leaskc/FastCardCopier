@@ -72,6 +72,8 @@ Each transfer run gets its own dated session folder, so consecutive card ingests
 
 When enabled, the transfer begins automatically the moment a card is inserted, provided a destination folder is already set. The destination folder and all other settings can be configured from the gear icon before any card is inserted, so the workflow requires no interaction once set up.
 
+**Auto-start always resets to off when the app launches.** It must be explicitly enabled each session. This prevents unexpected transfers if the app is opened while a card is already inserted or is inserted before the photographer is ready.
+
 ---
 
 ## File types recognised
