@@ -6,8 +6,8 @@ struct FastCardCopierApp: App {
         WindowGroup {
             ContentView()
         }
+        .windowStyle(.hiddenTitleBar)
         .windowResizability(.contentSize)
-        .defaultSize(width: 400, height: 480)
         .commands {
             CommandGroup(replacing: .newItem) {}
         }
