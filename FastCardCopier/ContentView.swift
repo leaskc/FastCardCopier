@@ -490,11 +490,27 @@ struct ReadyStateView: View {
 
         Spacer()
 
-        PrimaryButton(
-            transferMode == .copy
-                ? "Copy \(card.totalFiles.formatted()) files · \(card.totalGBString)"
-                : "Move \(card.totalFiles.formatted()) files · \(card.totalGBString)",
-            action: onStartTransfer)
+        HStack(spacing: 10) {
+            // Eject
+            Button(action: { NSWorkspace.shared.unmountAndEjectDevice(atPath: card.url.path) }) {
+                Text("Eject card")
+                    .font(.system(size: 13, weight: .medium))
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 44)
+                    .overlay(RoundedRectangle(cornerRadius: 10)
+                        .stroke(cs == .dark ? Color.white.opacity(0.12) : Color.black.opacity(0.12),
+                                lineWidth: 0.5))
+            }
+            .buttonStyle(.plain)
+            .foregroundColor(cs == .dark ? .white : Color(hex: "1c1c1e"))
+
+            // Start transfer
+            PrimaryButton(
+                transferMode == .copy
+                    ? "Copy \(card.totalFiles.formatted()) files"
+                    : "Move \(card.totalFiles.formatted()) files",
+                action: onStartTransfer)
+        }
     }
 }
 
