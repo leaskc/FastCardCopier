@@ -208,7 +208,7 @@ class FileTransferManager: ObservableObject {
             guard isComplete, failedCount == 0, checksumFailedCount == 0,
                   let cardURL = capturedCardURL else { return }
             try? await Task.sleep(for: .seconds(0.5))   // brief pause to let the FS settle
-            NSWorkspace.shared.unmountAndEjectDevice(at: cardURL) { _ in }
+            _ = NSWorkspace.shared.unmountAndEjectDevice(atPath: cardURL.path)
         }
     }
 
