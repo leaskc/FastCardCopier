@@ -20,7 +20,8 @@ enum TransferState {
 }
 
 struct FileResult {
-    let filename: String
+    let sourcePath: String  // full path on the source volume
+    let filename: String    // last path component
     let size: Int64
     let success: Bool
     let verified: Bool  // checksum matched; false also when success is false
@@ -273,7 +274,7 @@ class FileTransferManager: ObservableObject {
                     await semaphore.wait()
                     defer { Task { await semaphore.signal() } }
                     guard !Task.isCancelled else {
-                        return FileResult(filename: "", size: 0, success: false,
+                        return FileResult(sourcePath: "", filename: "", size: 0, success: false,
                                           verified: false, skipped: false)
                     }
 
@@ -300,7 +301,7 @@ class FileTransferManager: ObservableObject {
                     case .skip:
                         let candidate = targetDir.appendingPathComponent(file.lastPathComponent)
                         if FileManager.default.fileExists(atPath: candidate.path) {
-                            return FileResult(filename: file.lastPathComponent, size: 0,
+                            return FileResult(sourcePath: file.path, filename: file.lastPathComponent, size: 0,
                                               success: true, verified: true, skipped: true)
                         }
                         destURL = candidate
@@ -318,14 +319,14 @@ class FileTransferManager: ObservableObject {
                             try FileManager.default.removeItem(at: file)
                         }
 
-                        return FileResult(filename: file.lastPathComponent, size: size,
+                        return FileResult(sourcePath: file.path, filename: file.lastPathComponent, size: size,
                                           success: true, verified: true, skipped: false)
                     } catch CopyError.checksumMismatch {
                         // temp already removed by copyAndVerify
-                        return FileResult(filename: file.lastPathComponent, size: size,
+                        return FileResult(sourcePath: file.path, filename: file.lastPathComponent, size: size,
                                           success: false, verified: false, skipped: false)
                     } catch {
-                        return FileResult(filename: file.lastPathComponent, size: size,
+                        return FileResult(sourcePath: file.path, filename: file.lastPathComponent, size: size,
                                           success: false, verified: false, skipped: false)
                     }
                 }

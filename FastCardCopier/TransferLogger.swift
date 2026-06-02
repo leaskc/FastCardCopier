@@ -58,7 +58,7 @@ struct TransferLogger {
         lines.append("Mode:         \(mode == .move ? "Move — clear card" : "Copy — keep originals")")
         lines.append("SHA-256:      \(verify ? "enabled" : "disabled")")
         lines.append("")
-        lines.append(String(format: "%-14s  %-12s  %s", "Result", "Size", "Filename"))
+        lines.append(String(format: "%-14s  %-12s  %s", "Result", "Size", "Source path"))
         lines.append(String(repeating: "-", count: 72))
 
         let byteFmt = ByteCountFormatter()
@@ -74,7 +74,7 @@ struct TransferLogger {
             else                         { status = "OK" }
 
             let sizeStr = byteFmt.string(fromByteCount: result.size)
-            lines.append(String(format: "%-14s  %-12s  %@", status, sizeStr, result.filename))
+            lines.append(String(format: "%-14s  %-12s  %@", status, sizeStr, result.sourcePath))
         }
 
         lines.append(String(repeating: "-", count: 72))
