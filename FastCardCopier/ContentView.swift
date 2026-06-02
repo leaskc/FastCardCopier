@@ -5,7 +5,7 @@ import AppKit
 
 extension Color {
     init(hex: String) {
-        var s = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
+        let s = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
         var v: UInt64 = 0
         Scanner(string: s).scanHexInt64(&v)
         let a, r, g, b: UInt64
