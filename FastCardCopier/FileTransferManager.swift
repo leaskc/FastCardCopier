@@ -160,6 +160,7 @@ class FileTransferManager: ObservableObject {
     @Published var bytesTransferred: Int64 = 0
     var totalTransferBytes: Int64 = 0
     var startTime: Date?
+    private var logResults: [FileResult] = []
 
     var remainingFiles: Int { max(0, totalFiles - completedFiles) }
     var progress: Double { totalFiles > 0 ? Double(completedFiles) / Double(totalFiles) : 0 }
@@ -194,6 +195,7 @@ class FileTransferManager: ObservableObject {
         verifyEnabled = verify
         activeMode = mode
         currentFile = ""
+        logResults = []
         bytesTransferred = 0
         totalTransferBytes = totalBytes
         startTime = Date()
@@ -333,6 +335,7 @@ class FileTransferManager: ObservableObject {
                 guard !result.filename.isEmpty else { continue }
                 completedFiles += 1
                 currentFile = result.filename
+                logResults.append(result)
                 if result.skipped {
                     skippedCount += 1
                 } else if result.success {
@@ -345,5 +348,23 @@ class FileTransferManager: ObservableObject {
         }
 
         state = Task.isCancelled ? .idle : .complete
+
+        // Write session log (always, including cancelled/partial runs)
+        if let start = startTime {
+            let captured = logResults
+            TransferLogger.write(
+                startTime: start,
+                cardName: cardName,
+                cardPath: cardRootURL?.path ?? "",
+                destination: rootDest.path,
+                mode: mode,
+                verify: verify,
+                results: captured,
+                skippedCount: skippedCount,
+                failedCount: failedCount,
+                checksumFailedCount: checksumFailedCount,
+                bytesTransferred: bytesTransferred
+            )
+        }
     }
 }

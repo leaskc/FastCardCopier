@@ -425,6 +425,13 @@ struct SettingsPopoverView: View {
             row("Preserve folder structure") {
                 Toggle("", isOn: $preserveStructure).labelsHidden().tint(sysBlue)
             }
+            Divider().opacity(0.4)
+            row("Transfer logs") {
+                Button("Open folder") { TransferLogger.openLogFolder() }
+                    .font(.system(size: 12))
+                    .foregroundColor(cs == .dark ? sysBlueLight : sysBlue)
+                    .buttonStyle(.plain)
+            }
         }
         .padding(16)
         .frame(width: 300)
