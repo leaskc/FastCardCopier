@@ -44,7 +44,7 @@ class CardDetector: ObservableObject {
             forName: NSWorkspace.didMountNotification, object: nil, queue: .main
         ) { [weak self] notification in
             guard let url = notification.userInfo?[NSWorkspace.volumeURLUserInfoKey] as? URL,
-                  (try? url.resourceValues(forKeys: [.volumeIsRemovableKey]))?.volumeIsRemovable == true
+                  url.path != "/"   // skip the system boot volume; scanCard filters everything else
             else { return }
             Task { @MainActor [weak self] in await self?.handleMount(url) }
         }
@@ -57,16 +57,33 @@ class CardDetector: ObservableObject {
     }
 
     private func checkExistingVolumes() {
-        // On launch, resource-value pre-fetching from mountedVolumeURLs can
-        // be unreliable, so skip the removable check and instead probe every
-        // volume mounted under /Volumes/. scanCard returns nil for anything
-        // that contains no recognised media files, acting as the real filter.
+        // Scan every volume under /Volumes/ and prefer the first one that
+        // contains recognised media files (so a card beats a plain SSD).
+        // If none have media, surface the first candidate so the UI can
+        // show an eject option rather than silently sitting on idle.
         guard let volumes = FileManager.default.mountedVolumeURLs(
             includingResourceValuesForKeys: nil, options: [])
         else { return }
-        for volume in volumes where volume.path.hasPrefix("/Volumes/") {
-            Task { await handleMount(volume) }
-            return  // one card at a time
+        let candidates = volumes.filter { $0.path.hasPrefix("/Volumes/") }
+        guard !candidates.isEmpty else { return }
+        isScanning = true
+        Task {
+            var firstEmpty: URL? = nil
+            for url in candidates {
+                let card = await Task.detached(priority: .userInitiated) {
+                    CardDetector.scanCard(at: url)
+                }.value
+                if let card {
+                    detectedCard = card
+                    emptyCardURL = nil
+                    isScanning = false
+                    return
+                } else if firstEmpty == nil {
+                    firstEmpty = url
+                }
+            }
+            emptyCardURL = firstEmpty
+            isScanning = false
         }
     }
 
