@@ -1,6 +1,5 @@
 import Foundation
 import CryptoKit
-import AppKit
 
 enum TransferMode: String, CaseIterable {
     case copy = "Copy"
@@ -208,7 +207,12 @@ class FileTransferManager: ObservableObject {
             guard isComplete, failedCount == 0, checksumFailedCount == 0,
                   let cardURL = capturedCardURL else { return }
             try? await Task.sleep(for: .seconds(0.5))   // brief pause to let the FS settle
-            _ = NSWorkspace.shared.unmountAndEjectDevice(atPath: cardURL.path)
+            let task = Process()
+            task.executableURL = URL(fileURLWithPath: "/usr/sbin/diskutil")
+            task.arguments = ["eject", cardURL.path]
+            task.standardOutput = FileHandle.nullDevice
+            task.standardError = FileHandle.nullDevice
+            try? task.run()
         }
     }
 

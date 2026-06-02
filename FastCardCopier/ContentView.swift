@@ -271,6 +271,18 @@ struct SecondaryButton: View {
     }
 }
 
+// MARK: - Eject helper
+
+/// Eject a mounted volume using diskutil — more reliable than NSWorkspace for physical media.
+func ejectVolume(at url: URL) {
+    let task = Process()
+    task.executableURL = URL(fileURLWithPath: "/usr/sbin/diskutil")
+    task.arguments = ["eject", url.path]
+    task.standardOutput = FileHandle.nullDevice
+    task.standardError = FileHandle.nullDevice
+    try? task.run()
+}
+
 // MARK: - State: Idle
 
 struct IdleStateView: View {
@@ -479,7 +491,7 @@ struct EmptyCardStateView: View {
         }
         Spacer()
         PrimaryButton("Eject card") {
-            NSWorkspace.shared.unmountAndEjectDevice(atPath: cardURL.path)
+            ejectVolume(at: cardURL)
         }
     }
 
@@ -532,7 +544,7 @@ struct ReadyStateView: View {
 
         HStack(spacing: 10) {
             // Eject
-            Button(action: { NSWorkspace.shared.unmountAndEjectDevice(atPath: card.url.path) }) {
+            Button(action: { ejectVolume(at: card.url) }) {
                 Text("Eject card")
                     .font(.system(size: 13, weight: .medium))
                     .frame(maxWidth: .infinity)
@@ -730,7 +742,7 @@ struct CompleteStateView: View {
         HStack(spacing: 10) {
             if let cardURL {
                 // Card still mounted — offer manual eject (auto-eject may have failed)
-                Button(action: { NSWorkspace.shared.unmountAndEjectDevice(atPath: cardURL.path) }) {
+                Button(action: { ejectVolume(at: cardURL) }) {
                     Text("Eject card")
                         .font(.system(size: 13, weight: .medium))
                         .frame(maxWidth: .infinity)
