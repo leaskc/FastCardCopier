@@ -797,6 +797,7 @@ struct ContentView: View {
     @AppStorage("useDarkMode") private var useDarkMode = false
 
     @State private var showSettings = false
+    @State private var lastTransferredCardURL: URL? = nil  // tracks which card we just copied from
 
     @Environment(\.colorScheme) private var cs
     private var isDark: Bool { cs == .dark }
@@ -815,11 +816,17 @@ struct ContentView: View {
     }
 
     private var appState: AppState {
-        if transferManager.isComplete { return .complete }
-        if transferManager.isRunning  { return .transferring }
+        if transferManager.isRunning { return .transferring }
         if let card = cardDetector.detectedCard {
+            // If complete and this is the same card (eject failed), stay on
+            // the complete screen so the eject button is still accessible.
+            // If it's a different card, move straight to ready.
+            if transferManager.isComplete && card.url == lastTransferredCardURL {
+                return .complete
+            }
             return destinationPath.isEmpty ? .noDestination(card) : .ready(card)
         }
+        if transferManager.isComplete { return .complete }
         if let url = cardDetector.emptyCardURL {
             return .emptyCard(url, url.lastPathComponent)
         }
@@ -850,20 +857,12 @@ struct ContentView: View {
         .preferredColorScheme(useDarkMode ? .dark : .light)
         .background(WindowConfigurator())
         .onChange(of: cardDetector.detectedCard) { _, newCard in
-            if transferManager.isComplete {
-                if newCard == nil {
-                    // Card removed while on complete screen — stay here so the
-                    // photographer can read the summary and see the ejected status.
-                    return
-                } else {
-                    // New card inserted while complete — reset first, then fall
-                    // through to auto-start logic below.
-                    transferManager.reset()
-                }
-            }
-            guard autoCopy, let card = newCard, let dest = destinationURL,
-                  !transferManager.isRunning, !transferManager.isComplete
-            else { return }
+            guard let card = newCard else { return }
+            // A new card has appeared — clear complete state from the previous run
+            if transferManager.isComplete { transferManager.reset() }
+            // Auto-start if enabled
+            guard autoCopy, let dest = destinationURL, !transferManager.isRunning else { return }
+            lastTransferredCardURL = card.url
             transferManager.start(files: card.files, destination: dest,
                                   mode: transferMode, collisionMode: collisionMode,
                                   verify: verifyChecksum, preserveStructure: preserveStructure,
@@ -950,6 +949,7 @@ struct ContentView: View {
                 onChangeDestination: chooseDestination,
                 onStartTransfer: {
                     guard let dest = destinationURL else { return }
+                    lastTransferredCardURL = card.url
                     transferManager.start(files: card.files, destination: dest,
                                           mode: transferMode, collisionMode: collisionMode,
                                           verify: verifyChecksum, preserveStructure: preserveStructure,
