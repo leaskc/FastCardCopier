@@ -1,5 +1,6 @@
 import Foundation
 import CryptoKit
+import AppKit
 
 enum TransferMode: String, CaseIterable {
     case copy = "Copy"
@@ -195,12 +196,19 @@ class FileTransferManager: ObservableObject {
         bytesTransferred = 0
         totalTransferBytes = totalBytes
         startTime = Date()
+        let capturedCardURL = cardRootURL
         transferTask = Task {
             await performTransfer(files: files, destination: destination,
                                   mode: mode, collisionMode: collisionMode, verify: verify,
                                   preserveStructure: preserveStructure,
-                                  cardRootURL: cardRootURL, cardName: cardName,
+                                  cardRootURL: capturedCardURL, cardName: cardName,
                                   startTime: self.startTime ?? Date())
+            // Auto-eject after a clean transfer — done here in the task so we know
+            // exactly when all file handles have been released.
+            guard isComplete, failedCount == 0, checksumFailedCount == 0,
+                  let cardURL = capturedCardURL else { return }
+            try? await Task.sleep(for: .seconds(0.5))   // brief pause to let the FS settle
+            NSWorkspace.shared.unmountAndEjectDevice(at: cardURL) { _ in }
         }
     }
 

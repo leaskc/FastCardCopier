@@ -858,15 +858,6 @@ struct ContentView: View {
                                   cardRootURL: card.url, cardName: card.name,
                                   totalBytes: card.totalBytes)
         }
-        .onChange(of: transferManager.isComplete) { _, isComplete in
-            // Auto-eject on a clean transfer (no failures, no checksum errors)
-            guard isComplete,
-                  transferManager.failedCount == 0,
-                  transferManager.checksumFailedCount == 0,
-                  let card = cardDetector.detectedCard
-            else { return }
-            NSWorkspace.shared.unmountAndEjectDevice(atPath: card.url.path)
-        }
     }
 
     // MARK: - Title bar
