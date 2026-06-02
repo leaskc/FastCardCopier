@@ -571,6 +571,7 @@ struct ReadyStateView: View {
 struct TransferringStateView: View {
     @ObservedObject var manager: FileTransferManager
     let cardName: String
+    let transferMode: TransferMode
     let onCancel: () -> Void
 
     @State private var now = Date()
@@ -581,7 +582,7 @@ struct TransferringStateView: View {
             RingProgress(progress: manager.progress, remaining: manager.remainingFiles)
 
             VStack(alignment: .leading, spacing: 0) {
-                Text("Copying from")
+                Text(transferMode == .move ? "Moving from" : "Copying from")
                     .font(.system(size: 11, weight: .semibold))
                     .textCase(.uppercase)
                     .tracking(0.8)
@@ -639,6 +640,7 @@ struct CompleteStateView: View {
     @ObservedObject var manager: FileTransferManager
     let destinationURL: URL?
     let cardURL: URL?
+    let transferMode: TransferMode
     let onReset: () -> Void
     @Environment(\.colorScheme) private var cs
 
@@ -668,7 +670,8 @@ struct CompleteStateView: View {
         manager.checksumFailedCount > 0 || manager.failedCount > 0
     }
 
-    private var copiedCount: Int { manager.totalFiles - manager.skippedCount }
+    private var transferredCount: Int { manager.totalFiles - manager.skippedCount }
+    private var verb: String { transferMode == .move ? "moved" : "copied" }
 
     var body: some View {
         Spacer()
@@ -690,9 +693,9 @@ struct CompleteStateView: View {
             }
 
             VStack(spacing: 6) {
-                Text(copiedCount == manager.totalFiles
-                     ? "All \(manager.totalFiles.formatted()) files copied"
-                     : "\(copiedCount.formatted()) of \(manager.totalFiles.formatted()) files copied")
+                Text(transferredCount == manager.totalFiles
+                     ? "All \(manager.totalFiles.formatted()) files \(verb)"
+                     : "\(transferredCount.formatted()) of \(manager.totalFiles.formatted()) files \(verb)")
                     .font(.system(size: 36, weight: .semibold, design: .rounded))
                     .monospacedDigit()
                     .multilineTextAlignment(.center)
@@ -717,13 +720,13 @@ struct CompleteStateView: View {
                     // no badge — verification was off
                 } else {
                     if manager.checksumFailedCount > 0 {
-                        Label("\(manager.checksumFailedCount) checksum failure\(manager.checksumFailedCount == 1 ? "" : "s") — re-copy those files",
+                        Label("\(manager.checksumFailedCount) checksum failure\(manager.checksumFailedCount == 1 ? "" : "s") — re-\(verb) those files",
                               systemImage: "exclamationmark.triangle.fill")
                             .font(.system(size: 12, weight: .medium))
                             .foregroundColor(.orange)
                     }
                     if manager.failedCount > 0 {
-                        Label("\(manager.failedCount) file\(manager.failedCount == 1 ? "" : "s") failed to copy",
+                        Label("\(manager.failedCount) file\(manager.failedCount == 1 ? "" : "s") failed to \(verb == "moved" ? "move" : "copy")",
                               systemImage: "xmark.circle.fill")
                             .font(.system(size: 12))
                             .foregroundColor(.red)
@@ -966,6 +969,7 @@ struct ContentView: View {
             TransferringStateView(
                 manager: transferManager,
                 cardName: cardDetector.detectedCard?.name ?? "Card",
+                transferMode: transferMode,
                 onCancel: { transferManager.cancel() }
             )
         case .complete:
@@ -973,6 +977,7 @@ struct ContentView: View {
                 manager: transferManager,
                 destinationURL: destinationURL,
                 cardURL: cardDetector.detectedCard?.url,
+                transferMode: transferMode,
                 onReset: { transferManager.reset() }
             )
         }
