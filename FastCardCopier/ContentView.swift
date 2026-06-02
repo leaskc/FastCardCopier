@@ -717,15 +717,33 @@ struct CompleteStateView: View {
                             .foregroundColor(.red)
                     }
                 }
+                // Eject status
+                if cardURL == nil {
+                    Label("Card ejected", systemImage: "eject.fill")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(.secondary)
+                }
             }
         }
         Spacer()
 
         HStack(spacing: 10) {
-            // Eject card
             if let cardURL {
+                // Card still mounted — offer manual eject (auto-eject may have failed)
                 Button(action: { NSWorkspace.shared.unmountAndEjectDevice(atPath: cardURL.path) }) {
                     Text("Eject card")
+                        .font(.system(size: 13, weight: .medium))
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 40)
+                        .overlay(RoundedRectangle(cornerRadius: 9)
+                            .stroke(cs == .dark ? Color.white.opacity(0.12) : Color.black.opacity(0.12), lineWidth: 0.5))
+                }
+                .buttonStyle(.plain)
+                .foregroundColor(cs == .dark ? .white : Color(hex: "1c1c1e"))
+            } else {
+                // Card ejected — Done returns to idle ready for the next card
+                Button(action: onReset) {
+                    Text("Done")
                         .font(.system(size: 13, weight: .medium))
                         .frame(maxWidth: .infinity)
                         .frame(height: 40)
@@ -820,11 +838,16 @@ struct ContentView: View {
         .preferredColorScheme(useDarkMode ? .dark : .light)
         .background(WindowConfigurator())
         .onChange(of: cardDetector.detectedCard) { _, newCard in
-            // Card removed — if transfer is complete, return to idle so the
-            // app is ready for the next card (and auto-start can fire again)
-            if newCard == nil && transferManager.isComplete {
-                transferManager.reset()
-                return
+            if transferManager.isComplete {
+                if newCard == nil {
+                    // Card removed while on complete screen — stay here so the
+                    // photographer can read the summary and see the ejected status.
+                    return
+                } else {
+                    // New card inserted while complete — reset first, then fall
+                    // through to auto-start logic below.
+                    transferManager.reset()
+                }
             }
             guard autoCopy, let card = newCard, let dest = destinationURL,
                   !transferManager.isRunning, !transferManager.isComplete
