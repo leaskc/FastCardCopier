@@ -817,19 +817,22 @@ struct ContentView: View {
 
     private var appState: AppState {
         if transferManager.isRunning { return .transferring }
+        // A newly inserted card (with or without media) takes priority over
+        // the complete summary, unless it's the same card that was just
+        // transferred (eject failed — keep showing summary + eject button).
         if let card = cardDetector.detectedCard {
-            // If complete and this is the same card (eject failed), stay on
-            // the complete screen so the eject button is still accessible.
-            // If it's a different card, move straight to ready.
             if transferManager.isComplete && card.url == lastTransferredCardURL {
                 return .complete
             }
             return destinationPath.isEmpty ? .noDestination(card) : .ready(card)
         }
-        if transferManager.isComplete { return .complete }
         if let url = cardDetector.emptyCardURL {
+            if transferManager.isComplete && url == lastTransferredCardURL {
+                return .complete
+            }
             return .emptyCard(url, url.lastPathComponent)
         }
+        if transferManager.isComplete { return .complete }
         return cardDetector.isScanning ? .scanning : .idle
     }
 
@@ -858,9 +861,7 @@ struct ContentView: View {
         .background(WindowConfigurator())
         .onChange(of: cardDetector.detectedCard) { _, newCard in
             guard let card = newCard else { return }
-            // A new card has appeared — clear complete state from the previous run
             if transferManager.isComplete { transferManager.reset() }
-            // Auto-start if enabled
             guard autoCopy, let dest = destinationURL, !transferManager.isRunning else { return }
             lastTransferredCardURL = card.url
             transferManager.start(files: card.files, destination: dest,
@@ -868,6 +869,10 @@ struct ContentView: View {
                                   verify: verifyChecksum, preserveStructure: preserveStructure,
                                   cardRootURL: card.url, cardName: card.name,
                                   totalBytes: card.totalBytes)
+        }
+        .onChange(of: cardDetector.emptyCardURL) { _, url in
+            guard url != nil else { return }
+            if transferManager.isComplete { transferManager.reset() }
         }
     }
 
