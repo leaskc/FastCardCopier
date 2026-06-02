@@ -44,11 +44,12 @@ class CardDetector: ObservableObject {
         ) { [weak self] notification in
             guard let url = notification.userInfo?[NSWorkspace.volumeURLUserInfoKey] as? URL
             else { return }
-            // Accept ejectable volumes only — this covers SD/CF cards in both
-            // built-in slots and external readers, while excluding fixed SSDs,
-            // internal drives, and network volumes.
-            let vals = try? url.resourceValues(forKeys: [.volumeIsEjectableKey, .volumeIsRemovableKey])
-            guard vals?.volumeIsEjectable == true || vals?.volumeIsRemovable == true else { return }
+            // Accept browsable volumes only — these are the volumes that appear
+            // in Finder (SD cards, CF cards, USB readers, external drives).
+            // macOS system volumes (Cryptex, Preboot, Recovery, VM) are not
+            // browsable and are excluded by this check.
+            let vals = try? url.resourceValues(forKeys: [.volumeIsBrowsableKey])
+            guard vals?.volumeIsBrowsable == true else { return }
             Task { @MainActor [weak self] in await self?.handleMount(url) }
         }
         unmountObserver = NSWorkspace.shared.notificationCenter.addObserver(
