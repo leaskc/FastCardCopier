@@ -351,10 +351,9 @@ class FileTransferManager: ObservableObject {
         state = Task.isCancelled ? .idle : .complete
 
         // Write session log (always, including cancelled/partial runs)
-        if let start = startTime {
-            let captured = logResults
-            TransferLogger.write(
-                startTime: start,
+        let captured = logResults
+        TransferLogger.write(
+                startTime: startTime,
                 cardName: cardName,
                 cardPath: cardRootURL?.path ?? "",
                 destination: rootDest.path,
@@ -366,6 +365,5 @@ class FileTransferManager: ObservableObject {
                 checksumFailedCount: checksumFailedCount,
                 bytesTransferred: bytesTransferred
             )
-        }
     }
 }
