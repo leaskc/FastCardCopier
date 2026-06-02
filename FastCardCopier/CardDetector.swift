@@ -31,7 +31,6 @@ class CardDetector: ObservableObject {
 
     init() {
         startMonitoring()
-        checkExistingVolumes()
     }
 
     deinit {
@@ -56,38 +55,7 @@ class CardDetector: ObservableObject {
         }
     }
 
-    private func checkExistingVolumes() {
-        // Scan every volume under /Volumes/ and prefer the first one that
-        // contains recognised media files (so a card beats a plain SSD).
-        // If none have media, surface the first candidate so the UI can
-        // show an eject option rather than silently sitting on idle.
-        guard let volumes = FileManager.default.mountedVolumeURLs(
-            includingResourceValuesForKeys: nil, options: [])
-        else { return }
-        let candidates = volumes.filter { $0.path.hasPrefix("/Volumes/") }
-        guard !candidates.isEmpty else { return }
-        isScanning = true
-        Task {
-            var firstEmpty: URL? = nil
-            for url in candidates {
-                let card = await Task.detached(priority: .userInitiated) {
-                    CardDetector.scanCard(at: url)
-                }.value
-                if let card {
-                    detectedCard = card
-                    emptyCardURL = nil
-                    isScanning = false
-                    return
-                } else if firstEmpty == nil {
-                    firstEmpty = url
-                }
-            }
-            emptyCardURL = firstEmpty
-            isScanning = false
-        }
-    }
-
-    private func handleMount(_ url: URL) async {
+private func handleMount(_ url: URL) async {
         isScanning = true
         let card = await Task.detached(priority: .userInitiated) {
             CardDetector.scanCard(at: url)
