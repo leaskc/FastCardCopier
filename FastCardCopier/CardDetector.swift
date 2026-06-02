@@ -42,9 +42,13 @@ class CardDetector: ObservableObject {
         mountObserver = NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didMountNotification, object: nil, queue: .main
         ) { [weak self] notification in
-            guard let url = notification.userInfo?[NSWorkspace.volumeURLUserInfoKey] as? URL,
-                  url.path != "/"   // skip the system boot volume; scanCard filters everything else
+            guard let url = notification.userInfo?[NSWorkspace.volumeURLUserInfoKey] as? URL
             else { return }
+            // Accept ejectable volumes only — this covers SD/CF cards in both
+            // built-in slots and external readers, while excluding fixed SSDs,
+            // internal drives, and network volumes.
+            let vals = try? url.resourceValues(forKeys: [.volumeIsEjectableKey, .volumeIsRemovableKey])
+            guard vals?.volumeIsEjectable == true || vals?.volumeIsRemovable == true else { return }
             Task { @MainActor [weak self] in await self?.handleMount(url) }
         }
         unmountObserver = NSWorkspace.shared.notificationCenter.addObserver(
