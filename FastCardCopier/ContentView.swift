@@ -720,7 +720,7 @@ struct CompleteStateView: View {
                     // no badge — verification was off
                 } else {
                     if manager.checksumFailedCount > 0 {
-                        Label("\(manager.checksumFailedCount) checksum failure\(manager.checksumFailedCount == 1 ? "" : "s") — re-\(verb) those files",
+                        Label("\(manager.checksumFailedCount) checksum failure\(manager.checksumFailedCount == 1 ? "" : "s") — \(verb == "moved" ? "move" : "copy") those files again",
                               systemImage: "exclamationmark.triangle.fill")
                             .font(.system(size: 12, weight: .medium))
                             .foregroundColor(.orange)
