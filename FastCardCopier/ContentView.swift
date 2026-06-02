@@ -571,7 +571,6 @@ struct ReadyStateView: View {
 struct TransferringStateView: View {
     @ObservedObject var manager: FileTransferManager
     let cardName: String
-    let transferMode: TransferMode
     let onCancel: () -> Void
 
     @State private var now = Date()
@@ -582,7 +581,7 @@ struct TransferringStateView: View {
             RingProgress(progress: manager.progress, remaining: manager.remainingFiles)
 
             VStack(alignment: .leading, spacing: 0) {
-                Text(transferMode == .move ? "Moving from" : "Copying from")
+                Text(manager.activeMode == .move ? "Moving from" : "Copying from")
                     .font(.system(size: 11, weight: .semibold))
                     .textCase(.uppercase)
                     .tracking(0.8)
@@ -640,7 +639,6 @@ struct CompleteStateView: View {
     @ObservedObject var manager: FileTransferManager
     let destinationURL: URL?
     let cardURL: URL?
-    let transferMode: TransferMode
     let onReset: () -> Void
     @Environment(\.colorScheme) private var cs
 
@@ -671,7 +669,7 @@ struct CompleteStateView: View {
     }
 
     private var transferredCount: Int { manager.totalFiles - manager.skippedCount }
-    private var verb: String { transferMode == .move ? "moved" : "copied" }
+    private var verb: String { manager.activeMode == .move ? "moved" : "copied" }
 
     var body: some View {
         Spacer()
@@ -969,7 +967,6 @@ struct ContentView: View {
             TransferringStateView(
                 manager: transferManager,
                 cardName: cardDetector.detectedCard?.name ?? "Card",
-                transferMode: transferMode,
                 onCancel: { transferManager.cancel() }
             )
         case .complete:
@@ -977,7 +974,6 @@ struct ContentView: View {
                 manager: transferManager,
                 destinationURL: destinationURL,
                 cardURL: cardDetector.detectedCard?.url,
-                transferMode: transferMode,
                 onReset: { transferManager.reset() }
             )
         }

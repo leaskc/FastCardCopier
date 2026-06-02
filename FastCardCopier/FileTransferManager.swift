@@ -154,7 +154,8 @@ class FileTransferManager: ObservableObject {
     @Published var failedCount = 0
     @Published var checksumFailedCount = 0
     @Published var skippedCount = 0
-    @Published var verifyEnabled = true   // reflects the setting used for the current/last run
+    @Published var verifyEnabled = true      // reflects the setting used for the current/last run
+    @Published var activeMode: TransferMode = .copy  // ditto — frozen at start, not live setting
     @Published var currentFile = ""
     @Published var bytesTransferred: Int64 = 0
     var totalTransferBytes: Int64 = 0
@@ -191,6 +192,7 @@ class FileTransferManager: ObservableObject {
         checksumFailedCount = 0
         skippedCount = 0
         verifyEnabled = verify
+        activeMode = mode
         currentFile = ""
         bytesTransferred = 0
         totalTransferBytes = totalBytes
